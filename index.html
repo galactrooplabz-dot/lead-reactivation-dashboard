@@ -629,7 +629,7 @@
               <tbody id="callsBody"></tbody>
             </table>
           </div>
-          <a href="#" class="sheet-link" id="sheetLink" target="_blank">View Full Google Sheet →</a>
+          <a href="#" class="sheet-link" onclick="openGoogleSheet(); return false;">View Full Google Sheet →</a>
         </div>
 
         <!-- Sidebar -->
@@ -654,8 +654,8 @@
           <!-- Quick Actions -->
           <div class="sidebar-section" style="background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%); border: 1px solid #cffafe;">
             <h3 class="section-title">Quick Actions</h3>
-            <button class="action-btn btn-primary">📥 Download Report</button>
-            <button class="action-btn btn-success">📤 Upload New Leads</button>
+            <button class="action-btn btn-primary" onclick="downloadReport()">📥 Download Report</button>
+            <button class="action-btn btn-success" onclick="alert('Upload feature will be enabled after client onboarding.')">📤 Upload New Leads</button>
           </div>
         </div>
       </div>
@@ -734,6 +734,7 @@
       const client = clientsDB[clientId];
       if (client && client.password === password) {
         currentClient = { id: clientId, ...client };
+        sessionStorage.setItem("loggedInClientId", clientId);
         showDashboard();
       } else {
         alert('Invalid credentials. Try: PHXRE001 / demo123 or SCOTRE002 / demo456');
@@ -789,9 +790,6 @@
         </tr>
       `).join('');
 
-      // Update Google Sheet link
-      document.getElementById('sheetLink').href = currentClient.googleSheetUrl;
-
       // Update sidebar
       const notificationIcon = currentClient.notificationMethod === 'sms' ? '📱' : '💬';
       document.getElementById('notificationMethod').textContent = `${notificationIcon} ${currentClient.notificationMethod.toUpperCase()}`;
@@ -802,12 +800,41 @@
     // Handle Logout
     function handleLogout() {
       currentClient = null;
+      sessionStorage.removeItem("loggedInClientId");
       document.getElementById('dashboardPage').classList.add('hidden');
       document.getElementById('loginPage').classList.remove('hidden');
       document.getElementById('loginForm').reset();
       document.getElementById('clientId').value = '';
       document.getElementById('password').value = '';
     }
+
+    // Open Google Sheet
+    function openGoogleSheet() {
+      window.open("https://docs.google.com/spreadsheets/d/1vl74qdul4LTJOTLqqrTfuEKXwnkrOgMlQ2n5rAGkn3I/edit?gid=1819691160#gid=1819691160", "_blank");
+    }
+
+    // Download Report
+    function downloadReport() {
+      const csvContent = "Name,Status,Interest,Date\nJohn Smith,transferred,hot,2026-05-02\nSarah Jones,voicemail,warm,2026-05-01\nMike Johnson,no answer,cold,2026-04-30\nLisa Brown,transferred,hot,2026-04-29\nDavid Lee,answered not interested,not_interested,2026-04-28";
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "lead-reactivation-report.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Login persistence: restore session on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      const savedClientId = sessionStorage.getItem("loggedInClientId");
+      if (savedClientId && clientsDB[savedClientId]) {
+        currentClient = { id: savedClientId, ...clientsDB[savedClientId] };
+        showDashboard();
+      }
+    });
   </script>
 </body>
 </html>

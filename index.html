@@ -403,6 +403,31 @@
       color: #6b7280;
     }
 
+    .badge-wrong-number {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .next-action-transfer {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .next-action-follow-up {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .next-action-nurture {
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    .next-action-exit {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
     .interest-hot {
       background: #fee2e2;
       color: #991b1b;
@@ -621,8 +646,9 @@
               <thead>
                 <tr>
                   <th>Name</th>
-                  <th>Status</th>
-                  <th>Interest</th>
+                  <th>Call Status</th>
+                  <th>Interest Level</th>
+                  <th>Next Action</th>
                   <th>Date</th>
                 </tr>
               </thead>
@@ -672,11 +698,11 @@
         notificationMethod: 'sms',
         businessHours: '9am-6pm MST',
         leads: [
-          { id: 1, name: 'John Smith', phone: '+16025551234', status: 'transferred', interest: 'hot', timeline: '0-90 days', date: '2026-05-02' },
-          { id: 2, name: 'Sarah Jones', phone: '+16025551235', status: 'voicemail', interest: 'warm', timeline: '3-6 months', date: '2026-05-01' },
-          { id: 3, name: 'Mike Johnson', phone: '+16025551236', status: 'no_answer', interest: 'cold', timeline: '6+ months', date: '2026-04-30' },
-          { id: 4, name: 'Lisa Brown', phone: '+16025551237', status: 'transferred', interest: 'hot', timeline: '0-90 days', date: '2026-04-29' },
-          { id: 5, name: 'David Lee', phone: '+16025551238', status: 'answered_not_interested', interest: 'not_interested', timeline: 'unknown', date: '2026-04-28' },
+          { id: 1, first_name: 'John', name: 'John Smith', phone: '+16025551234', original_interest: 'buying a home in Phoenix', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Pre-approved, motivated buyer, no agent', next_action: 'transfer', date: '2026-05-02' },
+          { id: 2, first_name: 'Sarah', name: 'Sarah Jones', phone: '+16025551235', original_interest: 'selling their condo', call_status: 'voicemail', interest_level: 'warm', timeline: '3-6 months', pre_approved: '', working_with_agent: '', transfer_attempted: 'no', notes: 'Left voicemail, planning to sell in a few months', next_action: 'follow_up', date: '2026-05-01' },
+          { id: 3, first_name: 'Mike', name: 'Mike Johnson', phone: '+16025551236', original_interest: 'investing in rental properties', call_status: 'no_answer', interest_level: 'cold', timeline: '6+ months', pre_approved: '', working_with_agent: '', transfer_attempted: 'no', notes: 'No answer, long-term prospect', next_action: 'nurture', date: '2026-04-30' },
+          { id: 4, first_name: 'Lisa', name: 'Lisa Brown', phone: '+16025551237', original_interest: 'upgrading to a larger home', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Pre-approved, ready to upgrade, no agent', next_action: 'transfer', date: '2026-04-29' },
+          { id: 5, first_name: 'David', name: 'David Lee', phone: '+16025551238', original_interest: 'first home purchase', call_status: 'answered_not_interested', interest_level: 'not_interested', timeline: 'unknown', pre_approved: 'no', working_with_agent: 'no', transfer_attempted: 'no', notes: 'No longer interested in buying', next_action: 'exit', date: '2026-04-28' },
         ],
         stats: {
           totalLeads: 250,
@@ -695,8 +721,8 @@
         notificationMethod: 'whatsapp',
         businessHours: '9am-6pm MST',
         leads: [
-          { id: 1, name: 'Emma Wilson', phone: '+14805551234', status: 'transferred', interest: 'hot', timeline: '0-90 days', date: '2026-05-02' },
-          { id: 2, name: 'Tom Harris', phone: '+14805551235', status: 'transferred', interest: 'hot', timeline: '0-90 days', date: '2026-05-01' },
+          { id: 1, first_name: 'Emma', name: 'Emma Wilson', phone: '+14805551234', original_interest: 'buying in Scottsdale', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Pre-approved, motivated, no agent', next_action: 'transfer', date: '2026-05-02' },
+          { id: 2, first_name: 'Tom', name: 'Tom Harris', phone: '+14805551235', original_interest: 'downsizing after retirement', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Retired, pre-approved, downsizing', next_action: 'transfer', date: '2026-05-01' },
         ],
         stats: {
           totalLeads: 180,
@@ -777,13 +803,18 @@
         <tr>
           <td>${lead.name}</td>
           <td>
-            <span class="badge badge-${lead.status.replace(/_/g, '-')}">
-              ${lead.status.replace(/_/g, ' ')}
+            <span class="badge badge-${lead.call_status.replace(/_/g, '-')}">
+              ${lead.call_status.replace(/_/g, ' ')}
             </span>
           </td>
           <td>
-            <span class="badge interest-${lead.interest.replace(/_/g, '-')}">
-              ${lead.interest}
+            <span class="badge interest-${lead.interest_level.replace(/_/g, '-')}">
+              ${lead.interest_level}
+            </span>
+          </td>
+          <td>
+            <span class="badge next-action-${lead.next_action.replace(/_/g, '-')}">
+              ${lead.next_action.replace(/_/g, ' ')}
             </span>
           </td>
           <td>${lead.date}</td>

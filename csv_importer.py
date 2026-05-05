@@ -3,20 +3,13 @@
 csv_importer.py
 Lead Reactivation — CSV → Google Sheet Importer (Admin Tool)
 
-Reads any local CSV, auto-maps columns to the standardized schema,
-creates a new Google Sheet inside your Drive folder, and writes the data.
-
-Usage:
-    python csv_importer.py --csv leads.csv --client "Phoenix Real Estate Group"
-
-Optional flags:
-    --folder  DRIVE_FOLDER_ID   (overrides the default in this file)
-    --creds   credentials.json  (path to service account key file)
+Run:
+    pip install -r requirements.txt
+    python csv_importer.py
 """
 
 import csv
 import sys
-import argparse
 from pathlib import Path
 
 import gspread
@@ -25,17 +18,16 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 
-# ─── CONFIGURATION ────────────────────────────────────────────────────────────
+# ─── FIXED CONFIG ─────────────────────────────────────────────────────────────
 
-CREDENTIALS_FILE    = "credentials.json"
-GOOGLE_DRIVE_FOLDER = "1B0htenH8mGMhjzq1C-c0fFwls_F5OsvE"
+CREDENTIALS_FILE = "credentials.json"
+DRIVE_FOLDER_ID  = "1B0htenH8mGMhjzq1C-c0fFwls_F5OsvE"
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
 
-# Every sheet we create will have exactly these 19 columns in this order.
 STANDARD_HEADERS = [
     "first_name",
     "last_name",
@@ -58,57 +50,78 @@ STANDARD_HEADERS = [
     "attempt_count",
 ]
 
-# These columns are filled by the calling system, not by the importer.
+# Columns filled by the calling system — leave blank on import except attempt_count
 SYSTEM_COLUMNS = {
-    "agent_name", "transfer_number", "call_status", "interest_level",
-    "timeline", "pre_approved", "working_with_agent", "transfer_attempted",
-    "notes", "next_action", "last_called", "recording", "attempt_count",
+    "call_status", "interest_level", "timeline", "pre_approved",
+    "working_with_agent", "transfer_attempted", "notes", "next_action",
+    "last_called", "recording",
 }
 
-# Flexible aliases for each required import field.
-# Keys must match the non-system entries in STANDARD_HEADERS.
+# Flexible aliases for each CSV-sourced field (all lowercase for matching)
 FIELD_ALIASES: dict[str, list[str]] = {
-    "first_name":        ["first_name", "firstname", "name", "full_name"],
-    "last_name":         ["last_name", "lastname", "surname"],
-    "phone_number":      ["phone", "phone_number", "mobile", "contact"],
-    "original_interest": ["interest", "original_interest", "property", "requirement"],
-    "lead_source":       ["source", "lead_source"],
-    "date_added":        ["date", "date_added", "created_at"],
+    "first_name": [
+        "first_name", "first name", "firstname",
+        "name", "full_name", "full name",
+    ],
+    "last_name": [
+        "last_name", "last name", "lastname", "surname",
+    ],
+    "phone_number": [
+        "phone", "phone_number", "phone number",
+        "mobile", "contact", "number",
+    ],
+    "lead_source": [
+        "lead_source", "lead source", "source", "platform",
+    ],
+    "original_interest": [
+        "original_interest", "original interest", "interest",
+        "requirement", "property", "enquiry", "inquiry",
+    ],
+    "date_added": [
+        "date_added", "date added", "date", "created_at", "created",
+    ],
 }
 
+# The 6 fields we import from the CSV (everything else comes from user input
+# or is left blank for the calling system)
+CSV_IMPORT_FIELDS = list(FIELD_ALIASES.keys())
 
-# ─── STEP 1 — AUTHENTICATION ──────────────────────────────────────────────────
 
-def build_clients(creds_file: str) -> tuple[gspread.Client, object]:
-    """
-    Authenticate with Google using a service account key file.
-    Returns (gspread_client, drive_service).
-    """
-    path = Path(creds_file)
-    if not path.exists():
-        _abort(
-            f"credentials.json not found at: {creds_file}\n"
-            "  Download your service account key from Google Cloud Console\n"
-            "  and place it in the same folder as this script."
-        )
+# ─── STEP 1 — COLLECT INPUTS ──────────────────────────────────────────────────
 
-    creds = Credentials.from_service_account_file(str(path), scopes=SCOPES)
-    gc    = gspread.Client(auth=creds)
-    drive = build("drive", "v3", credentials=creds)
-    return gc, drive
+def get_inputs() -> dict:
+    """Prompt the user for the 4 required inputs."""
+    print()
+    csv_path        = input("  CSV file path     : ").strip()
+    client_name     = input("  Client name       : ").strip()
+    agent_name      = input("  Agent name        : ").strip()
+    transfer_number = input("  Transfer number   : ").strip()
+    print()
+
+    if not csv_path:
+        _abort("CSV file path is required.")
+    if not client_name:
+        _abort("Client name is required.")
+
+    return {
+        "csv_path":        csv_path,
+        "client_name":     client_name,
+        "agent_name":      agent_name,
+        "transfer_number": transfer_number,
+    }
 
 
 # ─── STEP 2 — READ CSV ────────────────────────────────────────────────────────
 
-def read_csv(csv_file_path: str) -> tuple[list[str], list[dict]]:
+def read_csv(csv_path: str) -> tuple[list[str], list[dict]]:
     """
     Read a local CSV file.
-    Returns (header_row, list_of_row_dicts).
-    Skips fully-empty rows. Handles UTF-8 BOM automatically.
+    Returns (headers, rows_as_dicts).
+    Handles UTF-8 BOM and skips fully-blank rows.
     """
-    path = Path(csv_file_path)
+    path = Path(csv_path)
     if not path.exists():
-        _abort(f"CSV file not found: {csv_file_path}")
+        _abort(f"File not found: {csv_path}")
 
     with open(path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
@@ -120,56 +133,132 @@ def read_csv(csv_file_path: str) -> tuple[list[str], list[dict]]:
         ]
 
     if not headers:
-        _abort("CSV file has no header row.")
+        _abort("CSV has no header row.")
     if not rows:
-        _abort("CSV file has no data rows.")
+        _abort("CSV has no data rows.")
 
     return headers, rows
 
 
-# ─── STEP 3 — MAP FIELDS ──────────────────────────────────────────────────────
+# ─── STEP 3 — AUTO MAP FIELDS ─────────────────────────────────────────────────
 
 def map_fields(csv_headers: list[str]) -> dict[str, str | None]:
     """
-    Auto-detect which CSV column corresponds to each standard field.
-    Matching is case-insensitive and ignores leading/trailing whitespace.
-
-    Returns { standard_field: csv_column_name } or { standard_field: None }
-    when no match is found (will be left blank in the output sheet).
+    Build { standard_field: matching_csv_column } using case-insensitive
+    alias matching. Returns None for fields not found in the CSV.
     """
-    # Build a lowercase lookup: normalised_name → original_header_name
-    normalised = {h.strip().lower(): h for h in csv_headers}
-    mapping: dict[str, str | None] = {}
+    # Normalise every CSV header to lowercase for comparison
+    lookup: dict[str, str] = {h.strip().lower(): h for h in csv_headers}
 
+    mapping: dict[str, str | None] = {}
     for std_field, aliases in FIELD_ALIASES.items():
-        match = next(
-            (normalised[alias] for alias in aliases if alias in normalised),
+        matched = next(
+            (lookup[alias] for alias in aliases if alias in lookup),
             None
         )
-        mapping[std_field] = match
+        mapping[std_field] = matched
 
     return mapping
 
 
-# ─── STEP 4 — CREATE GOOGLE SHEET ─────────────────────────────────────────────
+def _needs_name_split(mapping: dict[str, str | None]) -> bool:
+    """
+    True when no explicit last_name column was found — which means the
+    first_name column likely holds a full name like "John Smith".
+    """
+    return mapping.get("last_name") is None
+
+
+def _split_name(full_name: str) -> tuple[str, str]:
+    """'John Smith Jr'  →  ('John', 'Smith Jr')"""
+    parts = full_name.strip().split(None, 1)
+    return (parts[0] if parts else ""), (parts[1] if len(parts) > 1 else "")
+
+
+# ─── STEP 4 — BUILD OUTPUT ROW ────────────────────────────────────────────────
+
+def transform_row(
+    csv_row: dict,
+    mapping: dict[str, str | None],
+    agent_name: str,
+    transfer_number: str,
+    split_names: bool,
+) -> list[str]:
+    """
+    Convert one CSV dict into a list that matches STANDARD_HEADERS order.
+
+    Logic:
+      - CSV fields  : pulled via mapping, empty string if unmapped
+      - Name split  : if no last_name column, split first_name on first space
+      - User fields : agent_name, transfer_number filled from prompts
+      - System cols : left blank (filled later by the calling system)
+      - attempt_count: always "0"
+    """
+    values: dict[str, str] = {}
+
+    # Pull the 6 CSV-sourced fields
+    for std_field in CSV_IMPORT_FIELDS:
+        src_col = mapping.get(std_field)
+        values[std_field] = str(csv_row.get(src_col, "")).strip() if src_col else ""
+
+    # Split full name into first + last when no explicit last_name column
+    if split_names and " " in values.get("first_name", ""):
+        values["first_name"], values["last_name"] = _split_name(values["first_name"])
+
+    # User-supplied fields
+    values["agent_name"]      = agent_name
+    values["transfer_number"] = transfer_number
+
+    # System columns → blank
+    for col in SYSTEM_COLUMNS:
+        values[col] = ""
+
+    # attempt_count → always 0 on first import
+    values["attempt_count"] = "0"
+
+    # Return in exact STANDARD_HEADERS order
+    return [values.get(col, "") for col in STANDARD_HEADERS]
+
+
+# ─── STEP 5 — CREATE GOOGLE SHEET ─────────────────────────────────────────────
+
+def authenticate(creds_file: str) -> tuple[gspread.Client, object]:
+    """
+    Load service account credentials and return (gspread_client, drive_service).
+    Uses the credentials file for BOTH gspread and the Drive API.
+    """
+    if not Path(creds_file).exists():
+        _abort(
+            f"{creds_file} not found.\n"
+            "  1. Go to Google Cloud Console > IAM > Service Accounts\n"
+            "  2. Create / select a service account\n"
+            "  3. Keys > Add Key > JSON > download\n"
+            "  4. Rename the file to credentials.json and place it here."
+        )
+
+    # gspread.service_account() is the most reliable method for service accounts
+    gc    = gspread.service_account(filename=creds_file)
+    creds = Credentials.from_service_account_file(creds_file, scopes=SCOPES)
+    drive = build("drive", "v3", credentials=creds)
+
+    return gc, drive
+
 
 def create_google_sheet(
     client_name: str,
-    folder_id: str,
     gc: gspread.Client,
     drive,
 ) -> tuple[gspread.Spreadsheet, str]:
     """
-    Create a new Google Sheet named 'Lead Reactivation - {client_name}'
-    directly inside the specified Drive folder.
-    Returns (spreadsheet_object, web_view_url).
+    Create 'Lead Reactivation - {client_name}' inside DRIVE_FOLDER_ID.
+    Returns (spreadsheet, web_view_url).
     """
     sheet_name = f"Lead Reactivation - {client_name}"
 
     metadata = {
         "name":     sheet_name,
         "mimeType": "application/vnd.google-apps.spreadsheet",
-        "parents":  [folder_id],
+        "parents":  [DRIVE_FOLDER_ID],
     }
 
     try:
@@ -178,117 +267,106 @@ def create_google_sheet(
             fields="id,webViewLink",
         ).execute()
     except HttpError as exc:
-        _abort(f"Google Drive API error while creating sheet:\n  {exc}")
+        _abort(f"Google Drive API error:\n  {exc}")
 
     spreadsheet = gc.open_by_key(created["id"])
     return spreadsheet, created["webViewLink"]
 
 
-# ─── STEP 5 + 6 — WRITE HEADERS AND INSERT DATA ───────────────────────────────
+# ─── STEP 6 — WRITE HEADERS + DATA ────────────────────────────────────────────
 
-def insert_rows(
+def write_to_sheet(
     spreadsheet: gspread.Spreadsheet,
-    rows: list[dict],
-    mapping: dict[str, str | None],
-) -> int:
+    data_rows: list[list[str]],
+) -> None:
     """
-    1. Write STANDARD_HEADERS to row 1, freeze and bold them.
-    2. Map each CSV row to the standard column order.
-    3. Append all data rows in chunks (safe for large files).
-    Returns total rows written.
+    Write standardised headers (row 1, bold, frozen) then all data rows.
+    Appends in chunks of 500 to stay inside API payload limits.
     """
     ws = spreadsheet.sheet1
     ws.clear()
 
-    # ── Headers ──────────────────────────────────────────────────────────────
+    # Row 1: headers
     ws.update("A1", [STANDARD_HEADERS])
     ws.freeze(rows=1)
+
+    # Format header row: bold + light grey background
     last_col = _col_letter(len(STANDARD_HEADERS))
     ws.format(
         f"A1:{last_col}1",
-        {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.95}},
+        {
+            "textFormat": {"bold": True},
+            "backgroundColor": {"red": 0.91, "green": 0.91, "blue": 0.91},
+        },
     )
 
-    # ── Data ─────────────────────────────────────────────────────────────────
-    data: list[list[str]] = []
-    for csv_row in rows:
-        out_row: list[str] = []
-        for col in STANDARD_HEADERS:
-            if col in SYSTEM_COLUMNS:
-                out_row.append("")          # filled later by the calling system
-            else:
-                src_col = mapping.get(col)
-                val = csv_row.get(src_col, "") if src_col else ""
-                out_row.append(str(val).strip())
-        data.append(out_row)
-
-    # Append in chunks to stay inside the 2 MB API payload limit
-    _batch_append(ws, data)
-
-    return len(data)
-
-
-def _batch_append(ws: gspread.Worksheet, data: list[list], chunk_size: int = 500) -> None:
-    """Append rows in chunks to avoid hitting API size limits."""
-    for i in range(0, len(data), chunk_size):
-        ws.append_rows(data[i : i + chunk_size], value_input_option="RAW")
+    # Rows 2+: data (chunked)
+    for i in range(0, len(data_rows), 500):
+        ws.append_rows(data_rows[i : i + 500], value_input_option="RAW")
 
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Import a CSV file into a standardized Lead Reactivation Google Sheet.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Examples:\n"
-            '  python csv_importer.py --csv leads.csv --client "Phoenix Real Estate Group"\n'
-            '  python csv_importer.py --csv leads.csv --client "Boise Med Spa" --creds /path/to/key.json\n'
-        ),
-    )
-    parser.add_argument("--csv",    required=True,                   help="Path to the local CSV file")
-    parser.add_argument("--client", required=True,                   help='Client name, e.g. "Phoenix Real Estate Group"')
-    parser.add_argument("--folder", default=GOOGLE_DRIVE_FOLDER,     help="Google Drive folder ID (optional override)")
-    parser.add_argument("--creds",  default=CREDENTIALS_FILE,        help="Path to service account key JSON (default: credentials.json)")
-    args = parser.parse_args()
-
     _banner()
 
-    # ── Step 1: Auth ─────────────────────────────────────────────────────────
-    _step(1, f"Authenticating  [{args.creds}]")
-    gc, drive = build_clients(args.creds)
-    _ok()
+    # ── Inputs ───────────────────────────────────────────────────────────────
+    inputs = get_inputs()
+    csv_path        = inputs["csv_path"]
+    client_name     = inputs["client_name"]
+    agent_name      = inputs["agent_name"]
+    transfer_number = inputs["transfer_number"]
 
-    # ── Step 2: Read CSV ──────────────────────────────────────────────────────
-    _step(2, f"Reading CSV     [{args.csv}]")
-    headers, rows = read_csv(args.csv)
-    _ok(f"{len(rows):,} data rows  •  {len(headers)} columns")
-    print(f"         Columns detected: {', '.join(headers)}")
+    # ── Read CSV ─────────────────────────────────────────────────────────────
+    print("[1] Reading CSV...")
+    headers, rows = read_csv(csv_path)
+    print(f"     {len(rows)} rows  |  {len(headers)} columns")
+    print(f"     Columns: {', '.join(headers)}")
 
-    # ── Step 3: Map fields ────────────────────────────────────────────────────
-    _step(3, "Mapping fields")
-    mapping = map_fields(headers)
-    print()
-    for std_field, src_col in mapping.items():
-        arrow = f"← \"{src_col}\"" if src_col else "← (not found — will be empty)"
-        print(f"         {std_field:<22}  {arrow}")
+    # ── Map fields ───────────────────────────────────────────────────────────
+    print("\n[2] Mapping fields to standard schema...")
+    mapping     = map_fields(headers)
+    split_names = _needs_name_split(mapping)
 
-    # ── Step 4: Create sheet ──────────────────────────────────────────────────
-    _step(4, f"Creating sheet  [Lead Reactivation - {args.client}]")
-    spreadsheet, sheet_url = create_google_sheet(args.client, args.folder, gc, drive)
-    _ok(f"id={spreadsheet.id}")
+    for std_field in CSV_IMPORT_FIELDS:
+        src = mapping[std_field]
+        tag = f'<-- "{src}"' if src else "<-- (not found, will be empty)"
+        print(f"     {std_field:<22}  {tag}")
 
-    # ── Step 5+6: Write + insert ──────────────────────────────────────────────
-    _step(5, "Writing headers and inserting data")
-    total = insert_rows(spreadsheet, rows, mapping)
-    _ok(f"{total:,} rows written")
+    if split_names and mapping.get("first_name"):
+        print(f'\n     NOTE: No last_name column found.')
+        print(f'           Values in "{mapping["first_name"]}" will be split into first + last.')
 
-    # ── Final summary ─────────────────────────────────────────────────────────
+    # ── Authenticate ─────────────────────────────────────────────────────────
+    print("\n[3] Authenticating with Google...")
+    gc, drive = authenticate(CREDENTIALS_FILE)
+    print("     OK - Authenticated")
+
+    # ── Create sheet ─────────────────────────────────────────────────────────
+    print(f"\n[4] Creating Google Sheet...")
+    spreadsheet, sheet_url = create_google_sheet(client_name, gc, drive)
+    print(f"     OK - Created: Lead Reactivation - {client_name}")
+    print(f"     ID: {spreadsheet.id}")
+
+    # ── Build data rows ───────────────────────────────────────────────────────
+    print("\n[5] Processing rows...")
+    data_rows = [
+        transform_row(row, mapping, agent_name, transfer_number, split_names)
+        for row in rows
+    ]
+    print(f"     OK - {len(data_rows)} rows ready")
+
+    # ── Write to sheet ────────────────────────────────────────────────────────
+    print(f"\n[6] Writing to Google Sheet...")
+    write_to_sheet(spreadsheet, data_rows)
+    print(f"     OK - Done")
+
+    # ── Summary ──────────────────────────────────────────────────────────────
     _divider()
-    print("  ✅  IMPORT COMPLETE")
+    print("  >> IMPORT COMPLETE")
     _divider()
-    print(f"  Sheet name  :  Lead Reactivation - {args.client}")
-    print(f"  Rows imported: {total:,}")
+    print(f"  Sheet name    : Lead Reactivation - {client_name}")
+    print(f"  Rows imported : {len(data_rows)}")
     print()
     print("  Sheet URL:")
     print(f"  {sheet_url}")
@@ -297,10 +375,10 @@ def main() -> None:
     _divider()
 
 
-# ─── HELPERS ──────────────────────────────────────────────────────────────────
+# ─── UTILITIES ────────────────────────────────────────────────────────────────
 
 def _col_letter(n: int) -> str:
-    """Convert 1-indexed column number to spreadsheet letter (1→A, 19→S, 27→AA)."""
+    """1-indexed column number → spreadsheet column letter (19 → S)."""
     result = ""
     while n:
         n, rem = divmod(n - 1, 26)
@@ -310,21 +388,12 @@ def _col_letter(n: int) -> str:
 
 def _banner() -> None:
     _divider()
-    print("  Lead Reactivation — CSV Importer")
+    print("  Lead Reactivation - CSV Importer  (Admin Tool)")
     _divider()
 
 
 def _divider() -> None:
-    print("\n" + "=" * 56)
-
-
-def _step(n: int, label: str) -> None:
-    print(f"\n[{n}] {label}  ", end="", flush=True)
-
-
-def _ok(detail: str = "") -> None:
-    suffix = f"  ({detail})" if detail else ""
-    print(f"✓{suffix}")
+    print("\n" + "-" * 52)
 
 
 def _abort(msg: str) -> None:

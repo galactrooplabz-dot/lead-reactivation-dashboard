@@ -428,6 +428,16 @@
       color: #6b7280;
     }
 
+    .badge-new {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .next-action-pending {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+
     .interest-hot {
       background: #fee2e2;
       color: #991b1b;
@@ -740,6 +750,7 @@
     };
 
     let currentClient = null;
+    let uploadedLeads = null;
 
     // Toggle Password Visibility
     function togglePassword() {
@@ -801,34 +812,34 @@
       `;
 
       // Update calls table
-      const callsBody = document.getElementById('callsBody');
-      callsBody.innerHTML = currentClient.leads.map(lead => `
-        <tr>
-          <td>${lead.name}</td>
-          <td>
-            <span class="badge badge-${lead.call_status.replace(/_/g, '-')}">
-              ${lead.call_status.replace(/_/g, ' ')}
-            </span>
-          </td>
-          <td>
-            <span class="badge interest-${lead.interest_level.replace(/_/g, '-')}">
-              ${lead.interest_level}
-            </span>
-          </td>
-          <td>
-            <span class="badge next-action-${lead.next_action.replace(/_/g, '-')}">
-              ${lead.next_action.replace(/_/g, ' ')}
-            </span>
-          </td>
-          <td>${lead.date}</td>
-        </tr>
-      `).join('');
+      renderLeadsTable(uploadedLeads || currentClient.leads);
 
       // Update sidebar
       const notificationIcon = currentClient.notificationMethod === 'sms' ? '📱' : '💬';
       document.getElementById('notificationMethod').textContent = `${notificationIcon} ${currentClient.notificationMethod.toUpperCase()}`;
       document.getElementById('businessHours').textContent = currentClient.businessHours;
       document.getElementById('phone').textContent = currentClient.phone;
+    }
+
+    // Render leads table — works for both demo leads and uploaded leads
+    function renderLeadsTable(leads) {
+      const callsBody = document.getElementById('callsBody');
+      if (!callsBody) return;
+      callsBody.innerHTML = leads.map(lead => {
+        const callStatus = lead.call_status || 'new';
+        const nextAction = lead.next_action || 'pending';
+        const interestCell = lead.interest_level
+          ? `<span class="badge interest-${lead.interest_level.replace(/_/g, '-')}">${lead.interest_level}</span>`
+          : `<span style="color:#64748b;font-size:12px;">${lead.original_interest || '—'}</span>`;
+        return `
+          <tr>
+            <td>${lead.name || lead.first_name || '—'}</td>
+            <td><span class="badge badge-${callStatus.replace(/_/g, '-')}">${callStatus.replace(/_/g, ' ')}</span></td>
+            <td>${interestCell}</td>
+            <td><span class="badge next-action-${nextAction.replace(/_/g, '-')}">${nextAction.replace(/_/g, ' ')}</span></td>
+            <td>${lead.date || '—'}</td>
+          </tr>`;
+      }).join('');
     }
 
     // Handle Logout
@@ -880,10 +891,25 @@
 
     reader.onload = function(e) {
       const text = e.target.result;
-      const rows = text.trim().split("\n");
+      const rows = text.trim().split("\n").map(row => row.split(","));
 
-      alert("Upload working ✅ Rows: " + (rows.length - 1));
-      console.log(text);
+      // Skip header row, filter empty rows, convert to lead objects
+      uploadedLeads = rows.slice(1)
+        .filter(row => row.length >= 2 && row[0].trim())
+        .map(row => ({
+          first_name: row[0] ? row[0].trim() : '',
+          name:       row[0] ? row[0].trim() : '',
+          phone:      row[1] ? row[1].trim() : '',
+          original_interest: row[2] ? row[2].trim() : '',
+          call_status: 'new',
+          interest_level: '',
+          next_action: 'pending',
+          date: '—'
+        }));
+
+      renderLeadsTable(uploadedLeads);
+      alert("Leads loaded successfully");
+      console.log("Uploaded leads:", uploadedLeads);
     };
 
     reader.readAsText(file);

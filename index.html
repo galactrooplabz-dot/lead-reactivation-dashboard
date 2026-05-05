@@ -637,6 +637,7 @@
         <div>
           <h1 class="header-title" id="clientName"></h1>
           <p class="header-subtitle" id="syncTime"></p>
+          <p style="font-size:12px;color:#94a3b8;margin:4px 0 0 0;">Showing qualified hot leads and completed follow-up actions.</p>
         </div>
         <button class="logout-btn" onclick="handleLogout()">🚪 Logout</button>
       </div>
@@ -648,17 +649,21 @@
 
       <!-- Content Grid -->
       <div class="content-grid">
-        <!-- Recent Calls -->
+        <!-- Hot Leads Summary -->
         <div class="card">
-          <h2 class="card-title">⚡ Recent Calls</h2>
+          <h2 class="card-title">🔥 Hot Leads Summary</h2>
           <div style="overflow-x: auto;">
             <table id="callsTable">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Call Status</th>
-                  <th>Interest Level</th>
-                  <th>Next Action</th>
+                  <th>Lead Name</th>
+                  <th>Phone</th>
+                  <th>Original Interest</th>
+                  <th>Timeline</th>
+                  <th>Pre-approved</th>
+                  <th>Working With Agent</th>
+                  <th>Action Taken</th>
+                  <th>Notes</th>
                   <th>Date</th>
                 </tr>
               </thead>
@@ -691,10 +696,6 @@
           <div class="sidebar-section" style="background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%); border: 1px solid #cffafe;">
             <h3 class="section-title">Quick Actions</h3>
             <button class="action-btn btn-primary" onclick="downloadReport()">📥 Download Report</button>
-            <label class="action-btn btn-success" style="cursor:pointer;">
-              📤 Upload New Leads
-              <input type="file" accept=".csv" style="display:none" onchange="handleFileUpload(event)">
-            </label>
           </div>
         </div>
       </div>
@@ -711,18 +712,14 @@
         notificationMethod: 'sms',
         businessHours: '9am-6pm MST',
         leads: [
-          { id: 1, first_name: 'John', name: 'John Smith', phone: '+16025551234', original_interest: 'buying a home in Phoenix', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Pre-approved, motivated buyer, no agent', next_action: 'transfer', date: '2026-05-02' },
-          { id: 2, first_name: 'Sarah', name: 'Sarah Jones', phone: '+16025551235', original_interest: 'selling their condo', call_status: 'voicemail', interest_level: 'warm', timeline: '3-6 months', pre_approved: '', working_with_agent: '', transfer_attempted: 'no', notes: 'Left voicemail, planning to sell in a few months', next_action: 'follow_up', date: '2026-05-01' },
-          { id: 3, first_name: 'Mike', name: 'Mike Johnson', phone: '+16025551236', original_interest: 'investing in rental properties', call_status: 'no_answer', interest_level: 'cold', timeline: '6+ months', pre_approved: '', working_with_agent: '', transfer_attempted: 'no', notes: 'No answer, long-term prospect', next_action: 'nurture', date: '2026-04-30' },
-          { id: 4, first_name: 'Lisa', name: 'Lisa Brown', phone: '+16025551237', original_interest: 'upgrading to a larger home', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Pre-approved, ready to upgrade, no agent', next_action: 'transfer', date: '2026-04-29' },
-          { id: 5, first_name: 'David', name: 'David Lee', phone: '+16025551238', original_interest: 'first home purchase', call_status: 'answered_not_interested', interest_level: 'not_interested', timeline: 'unknown', pre_approved: 'no', working_with_agent: 'no', transfer_attempted: 'no', notes: 'No longer interested in buying', next_action: 'exit', date: '2026-04-28' },
+          { name: 'Sarah Mitchell', phone: '+16025551234', original_interest: '3BR homes in Scottsdale under $500K', timeline: '0-90 days', pre_approved: 'Yes', working_with_agent: 'No', action_taken: 'Transferred to Agent', notes: 'Lease ending in 60 days. Strong buyer intent.', date: '2026-05-02' },
+          { name: 'Marcus Johnson', phone: '+14805551092', original_interest: '4BR in Chandler near Hamilton HS', timeline: '0-90 days', pre_approved: 'Yes', working_with_agent: 'No', action_taken: 'Appointment Booked', notes: 'Wants viewing this week.', date: '2026-05-02' },
         ],
         stats: {
-          totalLeads: 250,
-          hotLeads: 18,
-          warmLeads: 45,
-          coldLeads: 187,
-          conversionRate: 7.2
+          totalLeadsCalled: 250,
+          hotLeadsFound: 18,
+          transfersCompleted: 12,
+          appointmentsBooked: 6
         },
         googleSheetUrl: 'https://docs.google.com/spreadsheets/d/phx-re-001',
         lastSync: '2026-05-02 14:32 UTC'
@@ -734,15 +731,14 @@
         notificationMethod: 'whatsapp',
         businessHours: '9am-6pm MST',
         leads: [
-          { id: 1, first_name: 'Emma', name: 'Emma Wilson', phone: '+14805551234', original_interest: 'buying in Scottsdale', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Pre-approved, motivated, no agent', next_action: 'transfer', date: '2026-05-02' },
-          { id: 2, first_name: 'Tom', name: 'Tom Harris', phone: '+14805551235', original_interest: 'downsizing after retirement', call_status: 'transferred', interest_level: 'hot', timeline: '0-90 days', pre_approved: 'yes', working_with_agent: 'no', transfer_attempted: 'yes', notes: 'Retired, pre-approved, downsizing', next_action: 'transfer', date: '2026-05-01' },
+          { name: 'Emma Wilson', phone: '+14805551234', original_interest: 'Luxury condo in Old Town Scottsdale', timeline: '0-90 days', pre_approved: 'Yes', working_with_agent: 'No', action_taken: 'Transferred to Agent', notes: 'Cash buyer. Wants to close within 45 days.', date: '2026-05-02' },
+          { name: 'Tom Harris', phone: '+14805551235', original_interest: 'Downsizing to 2BR in Scottsdale', timeline: '0-90 days', pre_approved: 'Yes', working_with_agent: 'No', action_taken: 'Appointment Booked', notes: 'Retired, flexible schedule, motivated seller.', date: '2026-05-01' },
         ],
         stats: {
-          totalLeads: 180,
-          hotLeads: 12,
-          warmLeads: 38,
-          coldLeads: 130,
-          conversionRate: 6.7
+          totalLeadsCalled: 180,
+          hotLeadsFound: 12,
+          transfersCompleted: 8,
+          appointmentsBooked: 4
         },
         googleSheetUrl: 'https://docs.google.com/spreadsheets/d/scot-re-002',
         lastSync: '2026-05-02 14:15 UTC'
@@ -750,7 +746,6 @@
     };
 
     let currentClient = null;
-    let uploadedLeads = null;
 
     // Toggle Password Visibility
     function togglePassword() {
@@ -794,25 +789,25 @@
       const statsGrid = document.getElementById('statsGrid');
       statsGrid.innerHTML = `
         <div class="stat-card">
-          <p class="stat-label">Total Leads <span>📊</span></p>
-          <p class="stat-value" style="color: #3b82f6;">${currentClient.stats.totalLeads}</p>
+          <p class="stat-label">Total Leads Called <span>📞</span></p>
+          <p class="stat-value" style="color: #3b82f6;">${currentClient.stats.totalLeadsCalled}</p>
         </div>
         <div class="stat-card">
-          <p class="stat-label">Hot Leads <span>🔥</span></p>
-          <p class="stat-value" style="color: #ef4444;">${currentClient.stats.hotLeads}</p>
+          <p class="stat-label">Hot Leads Found <span>🔥</span></p>
+          <p class="stat-value" style="color: #ef4444;">${currentClient.stats.hotLeadsFound}</p>
         </div>
         <div class="stat-card">
-          <p class="stat-label">Warm Leads <span>🟡</span></p>
-          <p class="stat-value" style="color: #f59e0b;">${currentClient.stats.warmLeads}</p>
+          <p class="stat-label">Transfers Completed <span>🤝</span></p>
+          <p class="stat-value" style="color: #10b981;">${currentClient.stats.transfersCompleted}</p>
         </div>
         <div class="stat-card">
-          <p class="stat-label">Conversion Rate <span>📈</span></p>
-          <p class="stat-value" style="color: #10b981;">${currentClient.stats.conversionRate}%</p>
+          <p class="stat-label">Appointments Booked <span>📅</span></p>
+          <p class="stat-value" style="color: #f59e0b;">${currentClient.stats.appointmentsBooked}</p>
         </div>
       `;
 
       // Update calls table
-      renderLeadsTable(uploadedLeads || currentClient.leads);
+      renderLeadsTable(currentClient.leads);
 
       // Update sidebar
       const notificationIcon = currentClient.notificationMethod === 'sms' ? '📱' : '💬';
@@ -821,23 +816,26 @@
       document.getElementById('phone').textContent = currentClient.phone;
     }
 
-    // Render leads table — works for both demo leads and uploaded leads
+    // Render hot leads table
     function renderLeadsTable(leads) {
       const callsBody = document.getElementById('callsBody');
       if (!callsBody) return;
       callsBody.innerHTML = leads.map(lead => {
-        const callStatus = lead.call_status || 'new';
-        const nextAction = lead.next_action || 'pending';
-        const interestCell = lead.interest_level
-          ? `<span class="badge interest-${lead.interest_level.replace(/_/g, '-')}">${lead.interest_level}</span>`
-          : `<span style="color:#64748b;font-size:12px;">${lead.original_interest || '—'}</span>`;
+        const action = lead.action_taken || '—';
+        const actionClass = action.toLowerCase().includes('transfer') ? 'badge-transferred'
+          : action.toLowerCase().includes('appointment') || action.toLowerCase().includes('book') ? 'next-action-follow-up'
+          : 'badge-no-answer';
         return `
           <tr>
-            <td>${lead.name || lead.first_name || '—'}</td>
-            <td><span class="badge badge-${callStatus.replace(/_/g, '-')}">${callStatus.replace(/_/g, ' ')}</span></td>
-            <td>${interestCell}</td>
-            <td><span class="badge next-action-${nextAction.replace(/_/g, '-')}">${nextAction.replace(/_/g, ' ')}</span></td>
-            <td>${lead.date || '—'}</td>
+            <td style="font-weight:600;">${lead.name || '—'}</td>
+            <td style="font-family:monospace;font-size:13px;color:#64748b;">${lead.phone || '—'}</td>
+            <td>${lead.original_interest || '—'}</td>
+            <td><span class="badge badge-transferred">${lead.timeline || '—'}</span></td>
+            <td>${lead.pre_approved || '—'}</td>
+            <td>${lead.working_with_agent || '—'}</td>
+            <td><span class="badge ${actionClass}">${action}</span></td>
+            <td style="color:#64748b;font-size:12px;max-width:180px;">${lead.notes || '—'}</td>
+            <td style="color:#94a3b8;font-size:13px;">${lead.date || '—'}</td>
           </tr>`;
       }).join('');
     }
@@ -860,12 +858,16 @@
 
     // Download Report
     function downloadReport() {
-      const csvContent = "Name,Status,Interest,Date\nJohn Smith,transferred,hot,2026-05-02\nSarah Jones,voicemail,warm,2026-05-01\nMike Johnson,no answer,cold,2026-04-30\nLisa Brown,transferred,hot,2026-04-29\nDavid Lee,answered not interested,not_interested,2026-04-28";
+      const header = "Lead Name,Phone,Original Interest,Timeline,Pre-approved,Working With Agent,Action Taken,Notes,Date";
+      const rows = currentClient ? currentClient.leads.map(l =>
+        `"${l.name}","${l.phone}","${l.original_interest}","${l.timeline}","${l.pre_approved}","${l.working_with_agent}","${l.action_taken}","${l.notes}","${l.date}"`
+      ) : [];
+      const csvContent = [header, ...rows].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "lead-reactivation-report.csv";
+      a.download = "hot-leads-summary-report.csv";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -882,38 +884,5 @@
     });
   </script>
 
-  <script>
-  function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = function(e) {
-      const text = e.target.result;
-      const rows = text.trim().split("\n").map(row => row.split(","));
-
-      // Skip header row, filter empty rows, convert to lead objects
-      uploadedLeads = rows.slice(1)
-        .filter(row => row.length >= 2 && row[0].trim())
-        .map(row => ({
-          first_name: row[0] ? row[0].trim() : '',
-          name:       row[0] ? row[0].trim() : '',
-          phone:      row[1] ? row[1].trim() : '',
-          original_interest: row[2] ? row[2].trim() : '',
-          call_status: 'new',
-          interest_level: '',
-          next_action: 'pending',
-          date: '—'
-        }));
-
-      renderLeadsTable(uploadedLeads);
-      alert("Leads loaded successfully");
-      console.log("Uploaded leads:", uploadedLeads);
-    };
-
-    reader.readAsText(file);
-  }
-  </script>
 </body>
 </html>

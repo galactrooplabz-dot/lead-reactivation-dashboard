@@ -375,6 +375,58 @@
       background: #f8fafc;
     }
 
+    .table-scroll-container {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 420px;
+      border-radius: 4px;
+    }
+
+    #callsTable th {
+      position: sticky;
+      top: 0;
+      background: #ffffff;
+      z-index: 2;
+      padding: 11px 14px;
+      white-space: nowrap;
+      box-shadow: 0 1px 0 #e2e8f0;
+    }
+
+    #callsTable td {
+      padding: 11px 14px;
+      font-size: 13px;
+      vertical-align: top;
+    }
+
+    .col-notes {
+      max-width: 200px;
+      white-space: normal;
+      word-break: break-word;
+      min-width: 130px;
+    }
+
+    .col-date {
+      white-space: nowrap;
+    }
+
+    .client-selector {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+      background: #ffffff;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .client-selector:focus,
+    .client-selector:hover {
+      border-color: #3b82f6;
+    }
+
     .badge {
       display: inline-block;
       padding: 4px 10px;
@@ -639,7 +691,14 @@
           <p class="header-subtitle" id="syncTime"></p>
           <p style="font-size:12px;color:#94a3b8;margin:4px 0 0 0;">Showing qualified hot leads and completed follow-up actions.</p>
         </div>
-        <button class="logout-btn" onclick="handleLogout()">🚪 Logout</button>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <select id="clientSelector" class="client-selector" onchange="switchClient(this.value)">
+            <option value="PHXRE001">Phoenix Real Estate Group</option>
+            <option value="SCOTRE002">Scottsdale Realty Partners</option>
+            <option value="BOISESPA001">Boise Med Spa Demo</option>
+          </select>
+          <button class="logout-btn" onclick="handleLogout()">🚪 Logout</button>
+        </div>
       </div>
     </header>
 
@@ -652,7 +711,7 @@
         <!-- Hot Leads Summary -->
         <div class="card">
           <h2 class="card-title">🔥 Hot Leads Summary</h2>
-          <div style="overflow-x: auto;">
+          <div class="table-scroll-container">
             <table id="callsTable">
               <thead>
                 <tr>
@@ -721,7 +780,7 @@
           transfersCompleted: 12,
           appointmentsBooked: 6
         },
-        googleSheetUrl: 'https://docs.google.com/spreadsheets/d/phx-re-001',
+        googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1vl74qdul4LTJOTLqqrTfuEKXwnkrOgMlQ2n5rAGkn3I/edit?gid=1819691160#gid=1819691160',
         lastSync: '2026-05-02 14:32 UTC'
       },
       'SCOTRE002': {
@@ -740,8 +799,28 @@
           transfersCompleted: 8,
           appointmentsBooked: 4
         },
-        googleSheetUrl: 'https://docs.google.com/spreadsheets/d/scot-re-002',
+        googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1vl74qdul4LTJOTLqqrTfuEKXwnkrOgMlQ2n5rAGkn3I/edit?gid=1819691160#gid=1819691160',
         lastSync: '2026-05-02 14:15 UTC'
+      },
+      'BOISESPA001': {
+        password: 'demo789',
+        name: 'Boise Med Spa Demo',
+        phone: '+12085550000',
+        notificationMethod: 'sms',
+        businessHours: '9am-5pm MST',
+        leads: [
+          { name: 'Ashley Reed', phone: '+12085551234', original_interest: 'Botox + lip filler consultation', timeline: '0-90 days', pre_approved: 'Yes', working_with_agent: 'No', action_taken: 'Appointment Booked', notes: 'Requested first available slot. Returning client.', date: '2026-05-02' },
+          { name: 'Jordan Kim', phone: '+12085551876', original_interest: 'Laser hair removal full package', timeline: '0-90 days', pre_approved: 'Yes', working_with_agent: 'No', action_taken: 'Transferred to Staff', notes: 'Budget confirmed $2K+. Wants to start this month.', date: '2026-05-01' },
+          { name: 'Taylor Brooks', phone: '+12085552341', original_interest: 'CoolSculpting abdomen + flanks', timeline: '0-90 days', pre_approved: 'Yes', working_with_agent: 'No', action_taken: 'Appointment Booked', notes: 'Pre-paid consultation. High intent buyer.', date: '2026-04-30' },
+        ],
+        stats: {
+          totalLeadsCalled: 120,
+          hotLeadsFound: 22,
+          transfersCompleted: 15,
+          appointmentsBooked: 7
+        },
+        googleSheetUrl: 'https://docs.google.com/spreadsheets/d/1vl74qdul4LTJOTLqqrTfuEKXwnkrOgMlQ2n5rAGkn3I/edit?gid=1819691160#gid=1819691160',
+        lastSync: '2026-05-02 14:00 UTC'
       }
     };
 
@@ -776,16 +855,19 @@
       }
     }
 
-    // Show Dashboard
+    // Show Dashboard (page reveal + sync dropdown)
     function showDashboard() {
       document.getElementById('loginPage').classList.add('hidden');
       document.getElementById('dashboardPage').classList.remove('hidden');
+      document.getElementById('clientSelector').value = currentClient.id;
+      updateDashboard();
+    }
 
-      // Update header
+    // Update all dashboard data for currentClient
+    function updateDashboard() {
       document.getElementById('clientName').textContent = currentClient.name;
       document.getElementById('syncTime').textContent = `Lead Reactivation Dashboard • Last sync: ${currentClient.lastSync}`;
 
-      // Update stats
       const statsGrid = document.getElementById('statsGrid');
       statsGrid.innerHTML = `
         <div class="stat-card">
@@ -806,14 +888,19 @@
         </div>
       `;
 
-      // Update calls table
       renderLeadsTable(currentClient.leads);
 
-      // Update sidebar
       const notificationIcon = currentClient.notificationMethod === 'sms' ? '📱' : '💬';
       document.getElementById('notificationMethod').textContent = `${notificationIcon} ${currentClient.notificationMethod.toUpperCase()}`;
       document.getElementById('businessHours').textContent = currentClient.businessHours;
       document.getElementById('phone').textContent = currentClient.phone;
+    }
+
+    // Switch active client from dropdown
+    function switchClient(clientId) {
+      if (!clientsDB[clientId]) return;
+      currentClient = { id: clientId, ...clientsDB[clientId] };
+      updateDashboard();
     }
 
     // Render hot leads table
@@ -834,8 +921,8 @@
             <td>${lead.pre_approved || '—'}</td>
             <td>${lead.working_with_agent || '—'}</td>
             <td><span class="badge ${actionClass}">${action}</span></td>
-            <td style="color:#64748b;font-size:12px;max-width:180px;">${lead.notes || '—'}</td>
-            <td style="color:#94a3b8;font-size:13px;">${lead.date || '—'}</td>
+            <td class="col-notes" style="color:#64748b;font-size:12px;">${lead.notes || '—'}</td>
+            <td class="col-date" style="color:#94a3b8;">${lead.date || '—'}</td>
           </tr>`;
       }).join('');
     }
@@ -851,9 +938,9 @@
       document.getElementById('password').value = '';
     }
 
-    // Open Google Sheet
+    // Open Google Sheet for current client
     function openGoogleSheet() {
-      window.open("https://docs.google.com/spreadsheets/d/1vl74qdul4LTJOTLqqrTfuEKXwnkrOgMlQ2n5rAGkn3I/edit?gid=1819691160#gid=1819691160", "_blank");
+      window.open(currentClient.googleSheetUrl, "_blank");
     }
 
     // Download Report
